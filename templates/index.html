@@ -1,0 +1,58 @@
+
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel = "stylesheet", href = "static/css/styles.css">
+    <title>Real-Time Detection</title>
+</head>
+<body>
+  <h2>Original Webcam Feed</h2>
+  <video id="video" width="640" height="480" autoplay muted></video>
+  <h2>Processed Frame (with bounding boxes)</h2>
+  <img id="processed" width="640" height="480"/>
+
+<script>
+// URL of the Flask endpoint (built with url_for in the template)
+const processUrl = "{{ url_for('process_frame') }}";
+
+// Access the webcam stream via getUserMedia
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => {
+    const video = document.getElementById('video');
+    video.srcObject = stream;           // stream to video element
+    video.play();
+
+    // Create an offscreen canvas to capture frames
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    function sendFrame() {
+      // Draw current video frame to canvas
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Convert canvas to Blob (JPEG) and send to server
+      canvas.toBlob(blob => {
+        const formData = new FormData();
+        formData.append('frame', blob, 'frame.jpg');
+        fetch(processUrl, { method: 'POST', body: formData })
+          .then(res => res.blob())
+          .then(blob => {
+            // Set returned image as source of the <img>
+            document.getElementById('processed').src = URL.createObjectURL(blob);
+          })
+          .catch(err => console.error('Error:', err));
+      }, 'image/jpeg');
+    }
+
+    // Send frames at a fixed interval (e.g. ~10 FPS)
+    setInterval(sendFrame, 500);
+  })
+  .catch(err => console.error('getUserMedia error:', err));
+</script>
+</body>
+</html>
